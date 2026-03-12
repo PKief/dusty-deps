@@ -1,0 +1,46 @@
+{
+  "name": "dusty-deps",
+  "version": "0.1.0",
+  "description": "Check the age of npm dependencies and flag stale packages",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "dusty-deps": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "format": "prettier --write .",
+    "check-format": "prettier --check .",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "npm",
+    "dependencies",
+    "stale",
+    "outdated",
+    "age",
+    "maintenance"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "prettier": "^3.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
