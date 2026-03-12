@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dusty-deps — Find forgotten dependencies</title>
+  <meta name="description" content="Check the age of your npm production dependencies and flag stale packages before they become a liability.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+    :root {
+      --bg:        #141210;
+      --bg-raised: #1e1b17;
+      --bg-code:   #1a1714;
+      --surface:   #252119;
+      --border:    #352f26;
+      --text:      #ede7db;
+      --text-dim:  #9a9084;
+      --text-mute: #6b6358;
+      --amber:     #d4a853;
+      --amber-dim: #a68432;
+      --rust:      #c4724e;
+      --green:     #7fba6a;
+      --red:       #d4574e;
+      --yellow:    #d4a853;
+      --blue:      #6a9fba;
+      --font-display: 'DM Serif Display', Georgia, serif;
+      --font-body:    'DM Sans', system-ui, sans-serif;
+      --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ---- Dust canvas ---- */
+    #dust {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.4;
+    }
+
+    /* ---- Layout ---- */
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    section {
+      padding: 6rem 0;
+    }
+
+    /* ---- Nav ---- */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1.25rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      backdrop-filter: blur(16px) saturate(1.4);
+      -webkit-backdrop-filter: blur(16px) saturate(1.4);
+      background: rgba(20, 18, 16, 0.7);
+      border-bottom: 1px solid rgba(53, 47, 38, 0.4);
+      transition: background 0.3s;
+    }
+    nav .logo {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 1.05rem;
+      color: var(--amber);
+      letter-spacing: -0.02em;
+    }
+    nav .logo span { color: var(--text-dim); }
+    nav .links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+    nav .links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      transition: color 0.2s;
+    }
+    nav .links a:hover { color: var(--text); }
+
+    /* ---- Hero ---- */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-top: 6rem;
+      padding-bottom: 4rem;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -10%;
+      right: -20%;
+      width: 70vw;
+      height: 70vw;
+      max-width: 800px;
+      max-height: 800px;
+      background: radial-gradient(circle, rgba(212,168,83,0.06) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--amber);
+      background: rgba(212,168,83,0.08);
+      border: 1px solid rgba(212,168,83,0.15);
+      border-radius: 100px;
+      padding: 0.4rem 1rem;
+      margin-bottom: 2rem;
+      letter-spacing: 0.04em;
+      width: fit-content;
+    }
+    .hero-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { opacity: 1; }
+      50%     { opacity: 0.3; }
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-size: clamp(3rem, 7vw, 5.5rem);
+      line-height: 1.05;
+      letter-spacing: -0.025em;
+      margin-bottom: 1.75rem;
+      max-width: 14ch;
+    }
+    .hero h1 em {
+      font-style: italic;
+      color: var(--amber);
+    }
+    .hero-sub {
+      font-size: 1.2rem;
+      color: var(--text-dim);
+      max-width: 48ch;
+      line-height: 1.7;
+      margin-bottom: 3rem;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.85rem 1.75rem;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: var(--amber);
+      color: var(--bg);
+    }
+    .btn-primary:hover {
+      background: #e0b45e;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(212,168,83,0.25);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover {
+      color: var(--text);
+      border-color: var(--text-mute);
+    }
+
+    /* ---- Install snippet (hero) ---- */
+    .install-cmd {
+      margin-top: 2.5rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    .install-cmd:hover {
+      border-color: var(--text-mute);
+      background: var(--surface);
+    }
+    .install-cmd code { color: var(--text); }
+    .install-cmd code .flag { color: var(--amber); }
+    .install-cmd .copy-hint {
+      font-size: 0.7rem;
+      color: var(--text-mute);
+      background: var(--surface);
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      letter-spacing: 0.03em;
+      transition: color 0.2s;
+    }
+    .install-cmd:hover .copy-hint { color: var(--text-dim); }
+    .install-cmd.copied .copy-hint { color: var(--green); }
+
+    /* ---- Terminal output showcase ---- */
+    .terminal {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.75;
+      box-shadow:
+        0 1px 2px rgba(0,0,0,0.1),
+        0 8px 32px rgba(0,0,0,0.25),
+        0 0 0 1px rgba(255,255,255,0.02) inset;
+    }
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.85rem 1.25rem;
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid var(--border);
+    }
+    .terminal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--text-mute);
+      opacity: 0.35;
+    }
+    .terminal-title {
+      font-size: 0.7rem;
+      color: var(--text-mute);
+      margin-left: auto;
+      margin-right: auto;
+      letter-spacing: 0.04em;
+    }
+    .terminal-body {
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+    .terminal-body .prompt { color: var(--text-mute); }
+    .terminal-body .cmd { color: var(--text); }
+    .terminal-body .flag { color: var(--amber); }
+    .terminal-body .fail { color: var(--red); font-weight: 600; }
+    .terminal-body .pass { color: var(--green); }
+    .terminal-body .skip { color: var(--blue); }
+    .terminal-body .warn { color: var(--yellow); }
+    .terminal-body .dim { color: var(--text-mute); }
+    .terminal-body .line {
+      display: block;
+      white-space: nowrap;
+      opacity: 0;
+      animation: line-in 0.3s ease forwards;
+    }
+    @keyframes line-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---- Section styling ---- */
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: 1rem;
+    }
+    .section-heading {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 400;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin-bottom: 1.25rem;
+    }
+    .section-desc {
+      color: var(--text-dim);
+      font-size: 1.05rem;
+      max-width: 52ch;
+      margin-bottom: 3rem;
+    }
+
+    /* ---- Features grid ---- */
+    .features {
+      background: var(--bg-raised);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .feature-card {
+      background: var(--bg-raised);
+      padding: 2.5rem;
+      transition: background 0.3s;
+    }
+    .feature-card:hover {
+      background: var(--surface);
+    }
+    .feature-icon {
+      font-size: 1.5rem;
+      margin-bottom: 1.25rem;
+      display: block;
+      width: 44px;
+      height: 44px;
+      line-height: 44px;
+      text-align: center;
+      background: rgba(212,168,83,0.07);
+      border-radius: 10px;
+    }
+    .feature-card h3 {
+      font-family: var(--font-body);
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.65rem;
+      letter-spacing: -0.01em;
+    }
+    .feature-card p {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Usage / How it works ---- */
+    .usage-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: start;
+    }
+    .step-list {
+      list-style: none;
+      counter-reset: step;
+    }
+    .step-list li {
+      counter-increment: step;
+      position: relative;
+      padding-left: 3.5rem;
+      padding-bottom: 2.5rem;
+    }
+    .step-list li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0.1rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--amber);
+      width: 2rem;
+      height: 2rem;
+      line-height: 2rem;
+      text-align: center;
+      border: 1px solid rgba(212,168,83,0.25);
+      border-radius: 8px;
+      background: rgba(212,168,83,0.05);
+    }
+    .step-list li::after {
+      content: '';
+      position: absolute;
+      left: calc(1rem - 0.5px);
+      top: 2.5rem;
+      bottom: 0;
+      width: 1px;
+      background: var(--border);
+    }
+    .step-list li:last-child::after { display: none; }
+    .step-list li:last-child { padding-bottom: 0; }
+    .step-list h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+    .step-list p {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+
+    /* ---- Config ---- */
+    .config { background: var(--bg-raised); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .config-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: start;
+    }
+    .config-files {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .config-files li {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .config-files li::before {
+      content: '';
+      width: 4px;
+      height: 4px;
+      background: var(--amber-dim);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .config-files li:first-child { color: var(--text); }
+    .config-files li:first-child::before { background: var(--amber); }
+
+    /* ---- Code blocks ---- */
+    .code-block {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.8;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .code-block .key { color: var(--blue); }
+    .code-block .str { color: var(--green); }
+    .code-block .num { color: var(--amber); }
+    .code-block .comment { color: var(--text-mute); font-style: italic; }
+
+    /* ---- Footer ---- */
+    footer {
+      padding: 3rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer-inner p {
+      color: var(--text-mute);
+      font-size: 0.8rem;
+    }
+    .footer-inner a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.8rem;
+      transition: color 0.2s;
+    }
+    .footer-inner a:hover { color: var(--amber); }
+
+    /* ---- Scroll reveal ---- */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 900px) {
+      .feature-grid { grid-template-columns: 1fr; }
+      .usage-grid,
+      .config-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+      nav .links { display: none; }
+    }
+    @media (max-width: 600px) {
+      section { padding: 4rem 0; }
+      .wrap { padding: 0 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="dust"></canvas>
+
+<nav>
+  <div class="logo">dusty-deps <span>v0.1</span></div>
+  <ul class="links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#config">Config</a></li>
+    <li><a href="https://github.com/pKief/dusty-deps">GitHub</a></li>
+  </ul>
+</nav>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-badge">zero dependencies</div>
+    <h1>Find the <em>forgotten</em> ones in node_modules</h1>
+    <p class="hero-sub">
+      <code>npm outdated</code> checks for newer versions. It won't tell you the "latest" was published five years ago. <strong>dusty-deps</strong> finds what's been left behind.
+    </p>
+    <div class="hero-actions">
+      <a href="#usage" class="btn btn-primary">Get Started</a>
+      <a href="https://github.com/pKief/dusty-deps" class="btn btn-ghost">View on GitHub</a>
+    </div>
+    <div class="install-cmd" onclick="copyInstall(this)" role="button" tabindex="0">
+      <code>npm install <span class="flag">-D</span> dusty-deps</code>
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TERMINAL ============ -->
+<section style="padding-top:0">
+  <div class="wrap reveal">
+    <div class="terminal">
+      <div class="terminal-bar">
+        <span class="terminal-dot"></span>
+        <span class="terminal-dot"></span>
+        <span class="terminal-dot"></span>
+        <span class="terminal-title">Terminal</span>
+      </div>
+      <div class="terminal-body" id="term-body">
+        <span class="line" style="animation-delay:.0s"><span class="prompt">$</span> <span class="cmd">dusty-deps</span></span>
+        <span class="line" style="animation-delay:.15s"><span class="dim">Checking 49 production dependencies (threshold: 1095 days / 3.0 years)...</span></span>
+        <span class="line" style="animation-delay:.3s">&nbsp;</span>
+        <span class="line" style="animation-delay:.45s">  <span class="fail">[FAIL]</span> <span class="dim">path@0.12.7 — last release: 2015-09-13 (10.5 years ago)</span></span>
+        <span class="line" style="animation-delay:.55s">  <span class="fail">[FAIL]</span> <span class="dim">concat-stream@2.0.0 — last release: 2018-12-21 (7.2 years ago)</span></span>
+        <span class="line" style="animation-delay:.65s">  <span class="fail">[FAIL]</span> <span class="dim">xvfb@0.4.0 — last release: 2020-07-05 (5.7 years ago)</span></span>
+        <span class="line" style="animation-delay:.75s">  <span class="pass">[PASS]</span> <span class="dim">express@4.22.1 — last release: 2025-12-01 (3.3 months ago)</span></span>
+        <span class="line" style="animation-delay:.85s">  <span class="pass">[PASS]</span> <span class="dim">helmet@8.1.0 — last release: 2025-03-17 (11.8 months ago)</span></span>
+        <span class="line" style="animation-delay:.95s">  <span class="skip">[SKIP]</span> <span class="dim">lodash@4.17.23 — allowlisted: "Stable utility library"</span></span>
+        <span class="line" style="animation-delay:1.05s">  <span class="warn">[WARN]</span> <span class="dim">@sap/cds@8.7.2 — could not fetch publish dates</span></span>
+        <span class="line" style="animation-delay:1.15s">&nbsp;</span>
+        <span class="line" style="animation-delay:1.25s"><span class="dim">Summary: 40 passed, 3 failed, 1 allowlisted, 5 unknown</span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section class="features" id="features">
+  <div class="wrap">
+    <div class="section-label reveal">Features</div>
+    <h2 class="section-heading reveal">Built for real-world dependency hygiene</h2>
+    <p class="section-desc reveal">
+      A single command surfaces unmaintained packages lurking in your production dependencies.
+    </p>
+    <div class="feature-grid reveal">
+      <div class="feature-card">
+        <span class="feature-icon">&#9201;</span>
+        <h3>Age-based detection</h3>
+        <p>Flags dependencies whose latest npm release exceeds a configurable threshold. Default: 3&nbsp;years.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#9745;</span>
+        <h3>Allowlist with reasons</h3>
+        <p>Intentionally old packages get documented in a config file — not silently ignored. Every exception has a reason.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#9881;</span>
+        <h3>Zero runtime dependencies</h3>
+        <p>Uses only Node.js built-ins. The package that checks your dependency hygiene doesn't add to the problem.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#8594;</span>
+        <h3>CI-ready exit codes</h3>
+        <p>Exit 0 when all pass, exit 1 when any fail. Drop it into any pipeline as a quality gate.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#123;&#125;</span>
+        <h3>JSON output</h3>
+        <p>Machine-readable output with <code>--json</code> for programmatic consumption and custom reporting.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#10697;</span>
+        <h3>Importable API</h3>
+        <p>Use <code>check()</code> directly in your own tools. Full TypeScript types included.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ USAGE ============ -->
+<section id="usage">
+  <div class="wrap">
+    <div class="usage-grid">
+      <div>
+        <div class="section-label reveal">Usage</div>
+        <h2 class="section-heading reveal">Three steps to clean dependencies</h2>
+        <ol class="step-list reveal">
+          <li>
+            <h4>Install</h4>
+            <p>Add it as a dev dependency or install it globally.</p>
+          </li>
+          <li>
+            <h4>Run</h4>
+            <p>Execute <code>dusty-deps</code> in any project with a <code>package.json</code>. It checks every production dependency against the npm registry.</p>
+          </li>
+          <li>
+            <h4>Decide</h4>
+            <p>Update stale packages, or add them to the allowlist with a documented reason. No silent tech debt.</p>
+          </li>
+        </ol>
+      </div>
+      <div class="reveal">
+        <div class="terminal" style="margin-bottom:1.5rem">
+          <div class="terminal-bar">
+            <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+            <span class="terminal-title">CLI options</span>
+          </div>
+          <div class="terminal-body">
+            <span class="line" style="animation-delay:0s"><span class="prompt">#</span> <span class="dim">default — 3 year threshold</span></span>
+            <span class="line" style="animation-delay:.08s"><span class="prompt">$</span> <span class="cmd">dusty-deps</span></span>
+            <span class="line" style="animation-delay:.16s">&nbsp;</span>
+            <span class="line" style="animation-delay:.24s"><span class="prompt">#</span> <span class="dim">custom threshold (2 years)</span></span>
+            <span class="line" style="animation-delay:.32s"><span class="prompt">$</span> <span class="cmd">dusty-deps</span> <span class="flag">--threshold</span> 730</span>
+            <span class="line" style="animation-delay:.4s">&nbsp;</span>
+            <span class="line" style="animation-delay:.48s"><span class="prompt">#</span> <span class="dim">JSON for CI pipelines</span></span>
+            <span class="line" style="animation-delay:.56s"><span class="prompt">$</span> <span class="cmd">dusty-deps</span> <span class="flag">--json</span></span>
+            <span class="line" style="animation-delay:.64s">&nbsp;</span>
+            <span class="line" style="animation-delay:.72s"><span class="prompt">#</span> <span class="dim">check a different project</span></span>
+            <span class="line" style="animation-delay:.8s"><span class="prompt">$</span> <span class="cmd">dusty-deps</span> <span class="flag">--cwd</span> ../other-project</span>
+          </div>
+        </div>
+        <div class="terminal">
+          <div class="terminal-bar">
+            <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+            <span class="terminal-title">Programmatic API</span>
+          </div>
+          <div class="terminal-body">
+            <span class="line" style="animation-delay:0s"><span class="key">import</span> { check } <span class="key">from</span> <span class="str">"dusty-deps"</span>;</span>
+            <span class="line" style="animation-delay:.08s">&nbsp;</span>
+            <span class="line" style="animation-delay:.16s"><span class="key">const</span> result = <span class="key">await</span> check({</span>
+            <span class="line" style="animation-delay:.24s">  cwd: <span class="str">"./my-project"</span>,</span>
+            <span class="line" style="animation-delay:.32s">  threshold: <span class="num">1095</span>,</span>
+            <span class="line" style="animation-delay:.4s">});</span>
+            <span class="line" style="animation-delay:.48s">&nbsp;</span>
+            <span class="line" style="animation-delay:.56s">console.log(result.failed); <span class="comment">// 3</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONFIG ============ -->
+<section class="config" id="config">
+  <div class="wrap">
+    <div class="config-grid">
+      <div>
+        <div class="section-label reveal">Configuration</div>
+        <h2 class="section-heading reveal">Document every exception</h2>
+        <p class="section-desc reveal">
+          The allowlist isn't just a skip list — it's a record of deliberate decisions. Every old dependency gets a reason.
+        </p>
+        <div class="reveal">
+          <h4 style="font-size:.85rem;color:var(--text-dim);margin-bottom:.75rem;font-weight:500">Config files (priority order)</h4>
+          <ul class="config-files">
+            <li>dusty-deps.config.json</li>
+            <li>dusty-deps.config.mjs</li>
+            <li>.dusty-depsrc.json</li>
+            <li>"dusty-deps" in package.json</li>
+          </ul>
+        </div>
+      </div>
+      <div class="reveal">
+        <div class="code-block">
+<span class="comment">// dusty-deps.config.json</span>
+{
+  <span class="key">"threshold"</span>: <span class="num">1095</span>,
+  <span class="key">"allowlist"</span>: {
+    <span class="key">"lodash"</span>: <span class="str">"Stable utility library, infrequent releases"</span>,
+    <span class="key">"path"</span>: <span class="str">"Node.js built-in polyfill, no updates expected"</span>,
+    <span class="key">"jszip"</span>: <span class="str">"Mature ZIP library, no known vulnerabilities"</span>
+  }
+}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section style="text-align:center;">
+  <div class="wrap reveal">
+    <h2 class="section-heading" style="max-width:20ch;margin:0 auto 1.25rem">Find out what's gathering dust</h2>
+    <p class="section-desc" style="margin:0 auto 2.5rem;text-align:center">
+      One command. Zero new dependencies. Full visibility into what's been forgotten.
+    </p>
+    <div class="install-cmd" onclick="copyInstall(this)" role="button" tabindex="0" style="margin:0 auto">
+      <code>npm install <span class="flag">-D</span> dusty-deps</code>
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-inner">
+      <p>MIT License</p>
+      <a href="https://github.com/pKief/dusty-deps">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  /* ---- Copy install command ---- */
+  function copyInstall(el) {
+    navigator.clipboard.writeText('npm install -D dusty-deps');
+    el.classList.add('copied');
+    el.querySelector('.copy-hint').textContent = 'copied!';
+    setTimeout(() => {
+      el.classList.remove('copied');
+      el.querySelector('.copy-hint').textContent = 'click to copy';
+    }, 2000);
+  }
+
+  /* ---- Scroll reveal ---- */
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    }
+  }, { threshold: 0.15 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  /* ---- Dust particles ---- */
+  (function() {
+    const canvas = document.getElementById('dust');
+    const ctx = canvas.getContext('2d');
+    let w, h, particles;
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    }
+
+    function init() {
+      resize();
+      const count = Math.min(Math.floor(w * h / 12000), 80);
+      particles = Array.from({ length: count }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: Math.random() * 1.5 + 0.5,
+        dx: (Math.random() - 0.5) * 0.15,
+        dy: (Math.random() - 0.5) * 0.1 + 0.05,
+        o: Math.random() * 0.5 + 0.1,
+        phase: Math.random() * Math.PI * 2,
+      }));
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      const t = performance.now() * 0.001;
+      for (const p of particles) {
+        p.x += p.dx + Math.sin(t + p.phase) * 0.08;
+        p.y += p.dy;
+        if (p.x < -10) p.x = w + 10;
+        if (p.x > w + 10) p.x = -10;
+        if (p.y > h + 10) { p.y = -10; p.x = Math.random() * w; }
+        const flicker = 0.7 + 0.3 * Math.sin(t * 1.5 + p.phase);
+        ctx.globalAlpha = p.o * flicker;
+        ctx.fillStyle = '#d4a853';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', resize);
+    init();
+    draw();
+  })();
+</script>
+</body>
+</html>
