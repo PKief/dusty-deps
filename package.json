@@ -27,7 +27,7 @@
     "format": "biome format --write .",
     "check": "biome check . && tsc --noEmit",
     "prepare": "husky",
-    "prepublishOnly": "npm run build"
+    "prepack": "npm run build"
   },
   "lint-staged": {
     "*.{ts,js,json}": "biome check --fix --no-errors-on-unmatched"

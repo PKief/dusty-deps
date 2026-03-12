@@ -59,7 +59,6 @@ Checking 49 production dependencies (threshold: 1095 days / 3.0 years)...
   [FAIL] concat-stream@2.0.0 — last release: 2018-12-21 (7.2 years ago)
   [PASS] express@4.22.1 — last release: 2025-12-01 (3.3 months ago)
   [SKIP] lodash@4.17.23 — allowlisted: "Stable utility library"
-  [WARN] @sap/cds@8.7.2 — could not fetch publish dates
 
 Summary: 40 passed, 2 failed, 1 allowlisted, 6 unknown
 

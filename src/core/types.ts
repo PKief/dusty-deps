@@ -27,4 +27,5 @@ export interface CheckOptions {
   threshold?: number;
   allowlist?: Record<string, string>;
   concurrency?: number;
+  onProgress?: (completed: number, total: number, name: string) => void;
 }

@@ -26,30 +26,39 @@ export async function check(options?: CheckOptions): Promise<CheckResult> {
   const depNames = Object.keys(deps);
   const now = new Date();
 
+  const total = depNames.length;
+  let completed = 0;
+
   const results = await processInBatches(depNames, concurrency, async (name) => {
     const version = deps[name] ?? "";
     const allowReason = allowlist[name];
 
+    let result: DependencyResult;
+
     if (allowReason) {
-      return { name, version, status: "skip" as const, reason: allowReason };
+      result = { name, version, status: "skip" as const, reason: allowReason };
+    } else {
+      const lastPublish = getLastPublishDate(name);
+      if (!lastPublish) {
+        result = { name, version, status: "unknown" as const };
+      } else {
+        const ageDays = Math.floor((now.getTime() - lastPublish.getTime()) / (1000 * 60 * 60 * 24));
+        const exceeded = ageDays > threshold;
+        result = {
+          name,
+          version,
+          status: exceeded ? ("fail" as const) : ("pass" as const),
+          lastPublish: formatDate(lastPublish),
+          ageDays,
+          ageFormatted: formatAge(ageDays),
+        } satisfies DependencyResult;
+      }
     }
 
-    const lastPublish = getLastPublishDate(name);
-    if (!lastPublish) {
-      return { name, version, status: "unknown" as const };
-    }
+    completed++;
+    options?.onProgress?.(completed, total, name);
 
-    const ageDays = Math.floor((now.getTime() - lastPublish.getTime()) / (1000 * 60 * 60 * 24));
-    const exceeded = ageDays > threshold;
-
-    return {
-      name,
-      version,
-      status: exceeded ? ("fail" as const) : ("pass" as const),
-      lastPublish: formatDate(lastPublish),
-      ageDays,
-      ageFormatted: formatAge(ageDays),
-    } satisfies DependencyResult;
+    return result;
   });
 
   results.sort((a, b) => {

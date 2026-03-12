@@ -586,7 +586,6 @@
         <span class="line" style="animation-delay:.75s">  <span class="pass">[PASS]</span> <span class="dim">express@4.22.1 — last release: 2025-12-01 (3.3 months ago)</span></span>
         <span class="line" style="animation-delay:.85s">  <span class="pass">[PASS]</span> <span class="dim">helmet@8.1.0 — last release: 2025-03-17 (11.8 months ago)</span></span>
         <span class="line" style="animation-delay:.95s">  <span class="skip">[SKIP]</span> <span class="dim">lodash@4.17.23 — allowlisted: "Stable utility library"</span></span>
-        <span class="line" style="animation-delay:1.05s">  <span class="warn">[WARN]</span> <span class="dim">@sap/cds@8.7.2 — could not fetch publish dates</span></span>
         <span class="line" style="animation-delay:1.15s">&nbsp;</span>
         <span class="line" style="animation-delay:1.25s"><span class="dim">Summary: 40 passed, 3 failed, 1 allowlisted, 5 unknown</span></span>
       </div>
@@ -785,7 +784,7 @@
   document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
   /* ---- Dust particles ---- */
-  (function() {
+  (() => {
     const canvas = document.getElementById('dust');
     const ctx = canvas.getContext('2d');
     let w, h, particles;

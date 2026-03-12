@@ -71,8 +71,25 @@ try {
   }
 
   const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
+  const isJson = values.json ?? false;
+  const isTTY = process.stderr.isTTY ?? false;
 
-  const result = await check({ cwd, threshold });
+  function renderProgress(completed: number, total: number, name: string) {
+    if (isJson || !isTTY) return;
+    const width = 20;
+    const filled = Math.round((completed / total) * width);
+    const bar = "\u2588".repeat(filled) + "\u2591".repeat(width - filled);
+    const line = `  ${bar} ${completed}/${total} ${name}`;
+    process.stderr.write(`\r${line}\x1b[K`);
+  }
+
+  function clearProgress() {
+    if (isJson || !isTTY) return;
+    process.stderr.write("\r\x1b[K");
+  }
+
+  const result = await check({ cwd, threshold, onProgress: renderProgress });
+  clearProgress();
 
   if (values.json) {
     console.log(JSON.stringify(result, null, 2));
