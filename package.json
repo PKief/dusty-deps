@@ -40,6 +40,15 @@
     "age",
     "maintenance"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PKief/dusty-deps.git"
+  },
+  "homepage": "https://github.com/PKief/dusty-deps#readme",
+  "bugs": {
+    "url": "https://github.com/PKief/dusty-deps/issues"
+  },
+  "funding": "https://github.com/sponsors/PKief",
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",
