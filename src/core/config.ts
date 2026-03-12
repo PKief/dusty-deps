@@ -47,8 +47,14 @@ function validateConfig(raw: unknown): DustyDepsConfig {
   }
 
   if (config.allowlist !== undefined) {
-    if (typeof config.allowlist !== "object" || config.allowlist === null || Array.isArray(config.allowlist)) {
-      throw new Error("dusty-deps config: allowlist must be an object mapping package names to reasons");
+    if (
+      typeof config.allowlist !== "object" ||
+      config.allowlist === null ||
+      Array.isArray(config.allowlist)
+    ) {
+      throw new Error(
+        "dusty-deps config: allowlist must be an object mapping package names to reasons",
+      );
     }
     const allowlist = config.allowlist as Record<string, unknown>;
     for (const [key, value] of Object.entries(allowlist)) {

@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const CLI_PATH = resolve(import.meta.dirname, "../dist/cli.js");
 
@@ -47,7 +47,7 @@ describe("CLI", () => {
   it("--json outputs valid JSON", () => {
     writeFileSync(
       join(tempDir, "package.json"),
-      JSON.stringify({ name: "test", dependencies: {} })
+      JSON.stringify({ name: "test", dependencies: {} }),
     );
     const output = run(["--json"]);
     const parsed = JSON.parse(output);
@@ -73,7 +73,7 @@ describe("CLI", () => {
   it("handles project with no dependencies", () => {
     writeFileSync(
       join(tempDir, "package.json"),
-      JSON.stringify({ name: "empty", dependencies: {} })
+      JSON.stringify({ name: "empty", dependencies: {} }),
     );
     const output = run([]);
     expect(output).toContain("0 production dependencies");

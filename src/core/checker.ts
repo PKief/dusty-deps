@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { loadConfig } from "./config.js";
 import { processInBatches } from "./concurrency.js";
+import { loadConfig } from "./config.js";
 import { formatAge, formatDate } from "./format.js";
 import { getLastPublishDate } from "./registry.js";
 import type { CheckOptions, CheckResult, DependencyResult } from "./types.js";
@@ -27,7 +27,7 @@ export async function check(options?: CheckOptions): Promise<CheckResult> {
   const now = new Date();
 
   const results = await processInBatches(depNames, concurrency, async (name) => {
-    const version = deps[name]!;
+    const version = deps[name] ?? "";
     const allowReason = allowlist[name];
 
     if (allowReason) {

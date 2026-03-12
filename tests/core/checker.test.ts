@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, cpSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { check } from "../../src/core/checker.js";
 
 vi.mock("../../src/core/registry.js", () => ({
@@ -9,6 +9,7 @@ vi.mock("../../src/core/registry.js", () => ({
 }));
 
 import { getLastPublishDate } from "../../src/core/registry.js";
+
 const mockGetLastPublishDate = vi.mocked(getLastPublishDate);
 
 let tempDir: string;
@@ -33,12 +34,9 @@ describe("check", () => {
           "fresh-pkg": "2.0.0",
           "unknown-pkg": "3.0.0",
         },
-      })
+      }),
     );
-    writeFileSync(
-      join(tempDir, "dusty-deps.config.json"),
-      JSON.stringify({ threshold: 1095 })
-    );
+    writeFileSync(join(tempDir, "dusty-deps.config.json"), JSON.stringify({ threshold: 1095 }));
 
     mockGetLastPublishDate.mockImplementation((name) => {
       if (name === "old-pkg") return new Date("2020-01-01");
@@ -68,7 +66,7 @@ describe("check", () => {
       JSON.stringify({
         name: "test",
         dependencies: { lodash: "4.17.21" },
-      })
+      }),
     );
 
     const result = await check({
@@ -88,12 +86,9 @@ describe("check", () => {
       JSON.stringify({
         name: "test",
         dependencies: { express: "4.0.0" },
-      })
+      }),
     );
-    writeFileSync(
-      join(tempDir, "dusty-deps.config.json"),
-      JSON.stringify({ threshold: 1095 })
-    );
+    writeFileSync(join(tempDir, "dusty-deps.config.json"), JSON.stringify({ threshold: 1095 }));
 
     mockGetLastPublishDate.mockReturnValue(new Date("2025-06-01"));
 
@@ -114,7 +109,7 @@ describe("check", () => {
           "skip-pkg": "1.0.0",
           "unknown-pkg": "1.0.0",
         },
-      })
+      }),
     );
 
     mockGetLastPublishDate.mockImplementation((name) => {
@@ -133,10 +128,7 @@ describe("check", () => {
   });
 
   it("handles project with no dependencies", async () => {
-    writeFileSync(
-      join(tempDir, "package.json"),
-      JSON.stringify({ name: "empty" })
-    );
+    writeFileSync(join(tempDir, "package.json"), JSON.stringify({ name: "empty" }));
 
     const result = await check({ cwd: tempDir });
     expect(result.checked).toBe(0);

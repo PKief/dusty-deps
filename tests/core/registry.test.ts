@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getLastPublishDate } from "../../src/core/registry.js";
 
 vi.mock("node:child_process", () => ({
@@ -6,6 +6,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execSync } from "node:child_process";
+
 const mockExecSync = vi.mocked(execSync);
 
 describe("getLastPublishDate", () => {
@@ -16,7 +17,7 @@ describe("getLastPublishDate", () => {
         modified: "2026-01-01T00:00:00.000Z",
         "1.0.0": "2018-06-15T00:00:00.000Z",
         "2.0.0": "2023-03-10T00:00:00.000Z",
-      })
+      }),
     );
 
     const result = getLastPublishDate("test-pkg");
@@ -44,9 +45,7 @@ describe("getLastPublishDate", () => {
   });
 
   it("handles single version", () => {
-    mockExecSync.mockReturnValue(
-      JSON.stringify({ "0.1.0": "2020-05-20T12:00:00.000Z" })
-    );
+    mockExecSync.mockReturnValue(JSON.stringify({ "0.1.0": "2020-05-20T12:00:00.000Z" }));
 
     const result = getLastPublishDate("tiny-pkg");
     expect(result).toEqual(new Date("2020-05-20T12:00:00.000Z"));

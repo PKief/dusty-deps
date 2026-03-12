@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { processInBatches } from "../../src/core/concurrency.js";
 
 describe("processInBatches", () => {
@@ -41,7 +41,7 @@ describe("processInBatches", () => {
       processInBatches(items, 2, async (n) => {
         if (n === 2) throw new Error("fail");
         return n;
-      })
+      }),
     ).rejects.toThrow("fail");
   });
 });

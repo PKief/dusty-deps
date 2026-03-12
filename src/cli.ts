@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { parseArgs } from "node:util";
 import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { check } from "./core/checker.js";
 import { formatAge } from "./core/format.js";
 
@@ -78,19 +78,19 @@ try {
     console.log(JSON.stringify(result, null, 2));
   } else {
     console.log(
-      `Checking ${result.checked} production dependencies (threshold: ${result.threshold} days / ${formatAge(result.threshold)})...\n`
+      `Checking ${result.checked} production dependencies (threshold: ${result.threshold} days / ${formatAge(result.threshold)})...\n`,
     );
 
     for (const r of result.results) {
       switch (r.status) {
         case "fail":
           console.log(
-            `  [FAIL] ${r.name}@${r.version} — last release: ${r.lastPublish} (${r.ageFormatted} ago)`
+            `  [FAIL] ${r.name}@${r.version} — last release: ${r.lastPublish} (${r.ageFormatted} ago)`,
           );
           break;
         case "pass":
           console.log(
-            `  [PASS] ${r.name}@${r.version} — last release: ${r.lastPublish} (${r.ageFormatted} ago)`
+            `  [PASS] ${r.name}@${r.version} — last release: ${r.lastPublish} (${r.ageFormatted} ago)`,
           );
           break;
         case "skip":
@@ -108,12 +108,12 @@ try {
     const unknown = result.results.filter((r) => r.status === "unknown");
 
     console.log(
-      `\nSummary: ${passed.length} passed, ${failed.length} failed, ${skipped.length} allowlisted, ${unknown.length} unknown`
+      `\nSummary: ${passed.length} passed, ${failed.length} failed, ${skipped.length} allowlisted, ${unknown.length} unknown`,
     );
 
     if (failed.length > 0) {
       console.log(
-        `\n${failed.length} dependency(s) exceed the ${formatAge(result.threshold)} threshold.`
+        `\n${failed.length} dependency(s) exceed the ${formatAge(result.threshold)} threshold.`,
       );
       console.log("Add them to your dusty-deps config allowlist with a reason, or update them.");
     }

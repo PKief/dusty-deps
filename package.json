@@ -22,10 +22,15 @@
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit",
-    "format": "prettier --write .",
-    "check-format": "prettier --check .",
+    "lint": "biome check .",
+    "lint:fix": "biome check --fix .",
+    "format": "biome format --write .",
+    "check": "biome check . && tsc --noEmit",
+    "prepare": "husky",
     "prepublishOnly": "npm run build"
+  },
+  "lint-staged": {
+    "*.{ts,js,json}": "biome check --fix --no-errors-on-unmatched"
   },
   "keywords": [
     "npm",
@@ -37,8 +42,10 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@biomejs/biome": "^2.4.6",
     "@types/node": "^22.0.0",
-    "prettier": "^3.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.3",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
