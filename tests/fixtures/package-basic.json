@@ -1,0 +1,9 @@
+{
+  "name": "test-project",
+  "version": "1.0.0",
+  "dependencies": {
+    "old-pkg": "1.0.0",
+    "fresh-pkg": "2.0.0",
+    "allowed-pkg": "3.0.0"
+  }
+}
