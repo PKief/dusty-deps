@@ -1,10 +1,16 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump type
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
@@ -40,6 +46,20 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        id: version
+        run: |
+          npm version ${{ inputs.bump }} -m "release: v%s"
+          echo "tag=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT"
+
+      - name: Push tag
+        run: git push --follow-tags
+
       - name: Publish to npm
         run: npm publish --provenance --access public
         env:
@@ -48,4 +68,5 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
           generate_release_notes: true
