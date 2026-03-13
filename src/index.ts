@@ -1,4 +1,5 @@
 export { check } from "./core/checker.js";
+export type { RegistryResult } from "./core/registry.js";
 export type {
   CheckOptions,
   CheckResult,

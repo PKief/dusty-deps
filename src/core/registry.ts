@@ -1,7 +1,12 @@
 const NPM_REGISTRY_URL = "https://registry.npmjs.org";
 const REQUEST_TIMEOUT_MS = 15_000;
 
-export async function getLastPublishDate(pkgName: string): Promise<Date | null> {
+export interface RegistryResult {
+  date: Date | null;
+  error?: string;
+}
+
+export async function getLastPublishDate(pkgName: string): Promise<RegistryResult> {
   const url = `${NPM_REGISTRY_URL}/${encodePackageName(pkgName)}`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -13,17 +18,23 @@ export async function getLastPublishDate(pkgName: string): Promise<Date | null> 
     });
 
     if (!response.ok) {
-      return null;
+      return { date: null, error: `registry returned ${response.status}` };
     }
 
     const data = (await response.json()) as { time?: Record<string, string> };
     if (!data.time) {
-      return null;
+      return { date: null, error: "no time data in registry response" };
     }
 
-    return findLatestPublishDate(data.time);
-  } catch {
-    return null;
+    return { date: findLatestPublishDate(data.time) };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.name === "AbortError"
+          ? "request timed out"
+          : error.message
+        : String(error);
+    return { date: null, error: message };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -34,6 +45,7 @@ function findLatestPublishDate(timeData: Record<string, string>): Date | null {
   for (const [key, timestamp] of Object.entries(timeData)) {
     if (key === "created" || key === "modified") continue;
     const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) continue;
     if (!latest || date > latest) {
       latest = date;
     }
@@ -41,6 +53,8 @@ function findLatestPublishDate(timeData: Record<string, string>): Date | null {
   return latest;
 }
 
+// Scoped packages like @scope/pkg need the slash encoded for the registry URL.
+// encodeURIComponent also prevents path traversal from malicious package names.
 function encodePackageName(name: string): string {
   if (name.startsWith("@")) {
     return `@${encodeURIComponent(name.slice(1))}`;

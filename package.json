@@ -49,6 +49,7 @@
     "url": "https://github.com/PKief/dusty-deps/issues"
   },
   "funding": "https://github.com/sponsors/PKief",
+  "author": "PKief",
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",

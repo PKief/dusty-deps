@@ -1,6 +1,6 @@
 /**
  * Process items concurrently using a pool-based approach.
- * Unlike batch processing, a new task starts immediately when any slot frees up,
+ * A new task starts immediately when any slot frees up,
  * keeping all slots busy at all times for maximum throughput.
  */
 export async function processInPool<T, R>(
@@ -10,19 +10,31 @@ export async function processInPool<T, R>(
 ): Promise<R[]> {
   if (items.length === 0) return [];
 
+  const effectiveConcurrency = Math.max(1, Math.min(Math.floor(concurrency), items.length));
   const results = new Array<R>(items.length);
   let nextIndex = 0;
+  let firstError: unknown = null;
 
   async function worker(): Promise<void> {
-    while (nextIndex < items.length) {
+    while (nextIndex < items.length && firstError === null) {
       const index = nextIndex++;
-      results[index] = await fn(items[index]);
+      if (index >= items.length) break;
+      try {
+        results[index] = await fn(items[index]);
+      } catch (error) {
+        if (firstError === null) {
+          firstError = error;
+        }
+      }
     }
   }
 
-  const workerCount = Math.min(concurrency, items.length);
-  const workers = Array.from({ length: workerCount }, () => worker());
+  const workers = Array.from({ length: effectiveConcurrency }, () => worker());
   await Promise.all(workers);
+
+  if (firstError !== null) {
+    throw firstError;
+  }
 
   return results;
 }

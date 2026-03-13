@@ -12,8 +12,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function getVersion(): string {
   const pkgPath = resolve(__dirname, "..", "package.json");
-  const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { version: string };
-  return pkg.version;
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as Record<string, unknown>;
+  const version = pkg.version;
+  if (typeof version !== "string") {
+    throw new Error("missing version in package.json");
+  }
+  return version;
 }
 
 const HELP = `
@@ -48,11 +52,15 @@ function formatResult(r: DependencyResult): string {
     case "skip":
       return `  [SKIP] ${r.name}@${r.version} — allowlisted: "${r.reason}"`;
     case "unknown":
-      return `  [WARN] ${r.name}@${r.version} — could not fetch publish dates`;
+      return `  [WARN] ${r.name}@${r.version} — could not fetch publish dates${r.error ? ` (${r.error})` : ""}`;
+    default: {
+      const _exhaustive: never = r;
+      return _exhaustive;
+    }
   }
 }
 
-try {
+async function main(): Promise<number> {
   const { values } = parseArgs({
     options: {
       threshold: { type: "string", short: "t" },
@@ -66,12 +74,12 @@ try {
 
   if (values.help) {
     console.log(HELP);
-    process.exit(0);
+    return 0;
   }
 
   if (values.version) {
     console.log(getVersion());
-    process.exit(0);
+    return 0;
   }
 
   let threshold: number | undefined;
@@ -79,7 +87,7 @@ try {
     threshold = Number(values.threshold);
     if (Number.isNaN(threshold) || threshold <= 0) {
       console.error("Error: --threshold must be a positive number");
-      process.exit(2);
+      return 2;
     }
   }
 
@@ -106,19 +114,19 @@ try {
   if (isJson) {
     console.log(JSON.stringify(result, null, 2));
   } else {
-    console.log(
-      `Checking ${result.checked} production dependencies (threshold: ${result.threshold} days / ${formatAge(result.threshold)})...\n`,
-    );
+    if (result.checked === 0) {
+      console.log("No production dependencies found.\n");
+    } else {
+      console.log(
+        `Checking ${result.checked} production dependencies (threshold: ${result.threshold} days / ${formatAge(result.threshold)})...\n`,
+      );
+    }
 
     for (const r of result.results) {
       console.log(formatResult(r));
     }
 
-    const counts = { pass: 0, fail: 0, skip: 0, unknown: 0 };
-    for (const r of result.results) {
-      counts[r.status]++;
-    }
-
+    const { counts } = result;
     console.log(
       `\nSummary: ${counts.pass} passed, ${counts.fail} failed, ${counts.skip} allowlisted, ${counts.unknown} unknown`,
     );
@@ -131,8 +139,15 @@ try {
     }
   }
 
-  process.exit(result.failed > 0 ? 1 : 0);
-} catch (error) {
-  console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
-  process.exit(2);
+  return result.counts.fail > 0 ? 1 : 0;
 }
+
+main().then(
+  (code) => {
+    process.exitCode = code;
+  },
+  (error) => {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 2;
+  },
+);

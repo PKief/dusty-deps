@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getLastPublishDate } from "../../src/core/registry.js";
 
 const mockFetch = vi.fn();
@@ -11,6 +11,10 @@ function jsonResponse(body: unknown, status = 200): Response {
     json: () => Promise.resolve(body),
   } as Response;
 }
+
+beforeEach(() => {
+  mockFetch.mockReset();
+});
 
 describe("getLastPublishDate", () => {
   it("returns the latest version date, ignoring created/modified", async () => {
@@ -26,21 +30,24 @@ describe("getLastPublishDate", () => {
     );
 
     const result = await getLastPublishDate("test-pkg");
-    expect(result).toEqual(new Date("2023-03-10T00:00:00.000Z"));
+    expect(result.date).toEqual(new Date("2023-03-10T00:00:00.000Z"));
+    expect(result.error).toBeUndefined();
   });
 
-  it("returns null when registry returns 404", async () => {
+  it("returns null with error when registry returns 404", async () => {
     mockFetch.mockResolvedValue(jsonResponse({}, 404));
 
     const result = await getLastPublishDate("nonexistent-pkg");
-    expect(result).toBeNull();
+    expect(result.date).toBeNull();
+    expect(result.error).toBe("registry returned 404");
   });
 
-  it("returns null when fetch throws", async () => {
+  it("returns null with error when fetch throws", async () => {
     mockFetch.mockRejectedValue(new Error("network error"));
 
     const result = await getLastPublishDate("failing-pkg");
-    expect(result).toBeNull();
+    expect(result.date).toBeNull();
+    expect(result.error).toBe("network error");
   });
 
   it("calls fetch with correct URL for scoped packages", async () => {
@@ -83,13 +90,42 @@ describe("getLastPublishDate", () => {
     );
 
     const result = await getLastPublishDate("tiny-pkg");
-    expect(result).toEqual(new Date("2020-05-20T12:00:00.000Z"));
+    expect(result.date).toEqual(new Date("2020-05-20T12:00:00.000Z"));
   });
 
   it("returns null when response has no time field", async () => {
     mockFetch.mockResolvedValue(jsonResponse({ name: "some-pkg" }));
 
     const result = await getLastPublishDate("some-pkg");
-    expect(result).toBeNull();
+    expect(result.date).toBeNull();
+    expect(result.error).toBe("no time data in registry response");
+  });
+
+  it("skips invalid date strings in time data", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        time: {
+          "1.0.0": "not-a-date",
+          "2.0.0": "2023-06-15T00:00:00.000Z",
+        },
+      }),
+    );
+
+    const result = await getLastPublishDate("mixed-dates-pkg");
+    expect(result.date).toEqual(new Date("2023-06-15T00:00:00.000Z"));
+  });
+
+  it("returns null when all time entries are invalid dates", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        time: {
+          "1.0.0": "garbage",
+          "2.0.0": "also-garbage",
+        },
+      }),
+    );
+
+    const result = await getLastPublishDate("bad-dates-pkg");
+    expect(result.date).toBeNull();
   });
 });

@@ -19,6 +19,34 @@ describe("processInPool", () => {
     expect(results).toEqual([2, 3]);
   });
 
+  it("clamps concurrency of 0 to 1", async () => {
+    const items = [1, 2, 3];
+    const results = await processInPool(items, 0, async (n) => n * 2);
+    expect(results).toEqual([2, 4, 6]);
+  });
+
+  it("clamps negative concurrency to 1", async () => {
+    const items = [1, 2];
+    const results = await processInPool(items, -5, async (n) => n + 10);
+    expect(results).toEqual([11, 12]);
+  });
+
+  it("floors non-integer concurrency", async () => {
+    let concurrent = 0;
+    let maxConcurrent = 0;
+
+    const items = [1, 2, 3, 4, 5];
+    await processInPool(items, 2.9, async (n) => {
+      concurrent++;
+      maxConcurrent = Math.max(maxConcurrent, concurrent);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      concurrent--;
+      return n;
+    });
+
+    expect(maxConcurrent).toBeLessThanOrEqual(2);
+  });
+
   it("respects concurrency limit", async () => {
     let concurrent = 0;
     let maxConcurrent = 0;
@@ -58,13 +86,29 @@ describe("processInPool", () => {
     expect(allFastFinishedBeforeSlow).toBe(true);
   });
 
-  it("propagates errors from fn", async () => {
-    const items = [1, 2, 3];
+  it("propagates the first error and stops processing", async () => {
+    const processed: number[] = [];
+    const items = [1, 2, 3, 4, 5];
+
     await expect(
-      processInPool(items, 2, async (n) => {
-        if (n === 2) throw new Error("fail");
+      processInPool(items, 1, async (n) => {
+        processed.push(n);
+        if (n === 2) throw new Error("fail at 2");
+        await new Promise((resolve) => setTimeout(resolve, 5));
         return n;
       }),
-    ).rejects.toThrow("fail");
+    ).rejects.toThrow("fail at 2");
+  });
+
+  it("does not produce unhandled rejections when multiple workers fail", async () => {
+    const items = [1, 2, 3, 4, 5, 6, 7, 8];
+
+    await expect(
+      processInPool(items, 4, async (n) => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        if (n % 2 === 0) throw new Error(`fail at ${n}`);
+        return n;
+      }),
+    ).rejects.toThrow(/fail at/);
   });
 });

@@ -1,19 +1,31 @@
 export type DependencyStatus = "fail" | "pass" | "skip" | "unknown";
 
-export interface DependencyResult {
-  name: string;
-  version: string;
-  status: DependencyStatus;
-  lastPublish?: string;
-  ageDays?: number;
-  ageFormatted?: string;
-  reason?: string;
-}
+export type DependencyResult =
+  | {
+      name: string;
+      version: string;
+      status: "fail" | "pass";
+      lastPublish: string;
+      ageDays: number;
+      ageFormatted: string;
+    }
+  | {
+      name: string;
+      version: string;
+      status: "skip";
+      reason: string;
+    }
+  | {
+      name: string;
+      version: string;
+      status: "unknown";
+      error?: string;
+    };
 
 export interface CheckResult {
   threshold: number;
   checked: number;
-  failed: number;
+  counts: Record<DependencyStatus, number>;
   results: DependencyResult[];
 }
 
