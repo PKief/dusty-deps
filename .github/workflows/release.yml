@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -51,14 +53,20 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Pull latest changes
+        run: git pull --rebase origin main
+
       - name: Bump version
         id: version
         run: |
           npm version ${{ inputs.bump }} -m "release: v%s"
           echo "tag=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT"
 
+      - name: Push release commit
+        run: git push origin main
+
       - name: Push tag
-        run: git push --follow-tags
+        run: git push origin ${{ steps.version.outputs.tag }}
 
       - name: Publish to npm
         run: npm publish --provenance --access public
