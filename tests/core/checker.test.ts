@@ -38,7 +38,7 @@ describe("check", () => {
     );
     writeFileSync(join(tempDir, "dusty-deps.config.json"), JSON.stringify({ threshold: 1095 }));
 
-    mockGetLastPublishDate.mockImplementation((name) => {
+    mockGetLastPublishDate.mockImplementation(async (name) => {
       if (name === "old-pkg") return new Date("2020-01-01");
       if (name === "fresh-pkg") return new Date("2026-01-01");
       return null;
@@ -90,7 +90,7 @@ describe("check", () => {
     );
     writeFileSync(join(tempDir, "dusty-deps.config.json"), JSON.stringify({ threshold: 1095 }));
 
-    mockGetLastPublishDate.mockReturnValue(new Date("2025-06-01"));
+    mockGetLastPublishDate.mockResolvedValue(new Date("2025-06-01"));
 
     const result = await check({ cwd: tempDir, threshold: 1 });
     expect(result.threshold).toBe(1);
@@ -112,7 +112,7 @@ describe("check", () => {
       }),
     );
 
-    mockGetLastPublishDate.mockImplementation((name) => {
+    mockGetLastPublishDate.mockImplementation(async (name) => {
       if (name === "fail-pkg") return new Date("2020-01-01");
       if (name === "pass-pkg") return new Date("2026-01-01");
       return null;

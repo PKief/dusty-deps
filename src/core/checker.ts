@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { processInBatches } from "./concurrency.js";
+import { processInPool } from "./concurrency.js";
 import { loadConfig } from "./config.js";
 import { formatAge, formatDate } from "./format.js";
 import { getLastPublishDate } from "./registry.js";
 import type { CheckOptions, CheckResult, DependencyResult } from "./types.js";
 
 const DEFAULT_THRESHOLD_DAYS = 1095;
-const DEFAULT_CONCURRENCY = 5;
+const DEFAULT_CONCURRENCY = 10;
 
 export async function check(options?: CheckOptions): Promise<CheckResult> {
   const cwd = options?.cwd ?? process.cwd();
@@ -29,31 +29,8 @@ export async function check(options?: CheckOptions): Promise<CheckResult> {
   const total = depNames.length;
   let completed = 0;
 
-  const results = await processInBatches(depNames, concurrency, async (name) => {
-    const version = deps[name] ?? "";
-    const allowReason = allowlist[name];
-
-    let result: DependencyResult;
-
-    if (allowReason) {
-      result = { name, version, status: "skip" as const, reason: allowReason };
-    } else {
-      const lastPublish = getLastPublishDate(name);
-      if (!lastPublish) {
-        result = { name, version, status: "unknown" as const };
-      } else {
-        const ageDays = Math.floor((now.getTime() - lastPublish.getTime()) / (1000 * 60 * 60 * 24));
-        const exceeded = ageDays > threshold;
-        result = {
-          name,
-          version,
-          status: exceeded ? ("fail" as const) : ("pass" as const),
-          lastPublish: formatDate(lastPublish),
-          ageDays,
-          ageFormatted: formatAge(ageDays),
-        } satisfies DependencyResult;
-      }
-    }
+  const results = await processInPool(depNames, concurrency, async (name) => {
+    const result = await checkDependency(name, deps[name] ?? "", allowlist, now, threshold);
 
     completed++;
     options?.onProgress?.(completed, total, name);
@@ -74,5 +51,33 @@ export async function check(options?: CheckOptions): Promise<CheckResult> {
     checked: results.length,
     failed: results.filter((r) => r.status === "fail").length,
     results,
+  };
+}
+
+async function checkDependency(
+  name: string,
+  version: string,
+  allowlist: Record<string, string>,
+  now: Date,
+  threshold: number,
+): Promise<DependencyResult> {
+  const allowReason = allowlist[name];
+  if (allowReason) {
+    return { name, version, status: "skip", reason: allowReason };
+  }
+
+  const lastPublish = await getLastPublishDate(name);
+  if (!lastPublish) {
+    return { name, version, status: "unknown" };
+  }
+
+  const ageDays = Math.floor((now.getTime() - lastPublish.getTime()) / (1000 * 60 * 60 * 24));
+  return {
+    name,
+    version,
+    status: ageDays > threshold ? "fail" : "pass",
+    lastPublish: formatDate(lastPublish),
+    ageDays,
+    ageFormatted: formatAge(ageDays),
   };
 }

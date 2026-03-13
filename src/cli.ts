@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { check } from "./core/checker.js";
 import { formatAge } from "./core/format.js";
+import type { DependencyResult } from "./core/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -38,6 +39,18 @@ Exit codes:
   1   One or more dependencies exceed the threshold
   2   Invalid arguments or configuration error
 `.trim();
+
+function formatResult(r: DependencyResult): string {
+  switch (r.status) {
+    case "fail":
+    case "pass":
+      return `  [${r.status.toUpperCase()}] ${r.name}@${r.version} — last release: ${r.lastPublish} (${r.ageFormatted} ago)`;
+    case "skip":
+      return `  [SKIP] ${r.name}@${r.version} — allowlisted: "${r.reason}"`;
+    case "unknown":
+      return `  [WARN] ${r.name}@${r.version} — could not fetch publish dates`;
+  }
+}
 
 try {
   const { values } = parseArgs({
@@ -79,8 +92,7 @@ try {
     const width = 20;
     const filled = Math.round((completed / total) * width);
     const bar = "\u2588".repeat(filled) + "\u2591".repeat(width - filled);
-    const line = `  ${bar} ${completed}/${total} ${name}`;
-    process.stderr.write(`\r${line}\x1b[K`);
+    process.stderr.write(`\r  ${bar} ${completed}/${total} ${name}\x1b[K`);
   }
 
   function clearProgress() {
@@ -91,7 +103,7 @@ try {
   const result = await check({ cwd, threshold, onProgress: renderProgress });
   clearProgress();
 
-  if (values.json) {
+  if (isJson) {
     console.log(JSON.stringify(result, null, 2));
   } else {
     console.log(
@@ -99,38 +111,21 @@ try {
     );
 
     for (const r of result.results) {
-      switch (r.status) {
-        case "fail":
-          console.log(
-            `  [FAIL] ${r.name}@${r.version} — last release: ${r.lastPublish} (${r.ageFormatted} ago)`,
-          );
-          break;
-        case "pass":
-          console.log(
-            `  [PASS] ${r.name}@${r.version} — last release: ${r.lastPublish} (${r.ageFormatted} ago)`,
-          );
-          break;
-        case "skip":
-          console.log(`  [SKIP] ${r.name}@${r.version} — allowlisted: "${r.reason}"`);
-          break;
-        case "unknown":
-          console.log(`  [WARN] ${r.name}@${r.version} — could not fetch publish dates`);
-          break;
-      }
+      console.log(formatResult(r));
     }
 
-    const failed = result.results.filter((r) => r.status === "fail");
-    const passed = result.results.filter((r) => r.status === "pass");
-    const skipped = result.results.filter((r) => r.status === "skip");
-    const unknown = result.results.filter((r) => r.status === "unknown");
+    const counts = { pass: 0, fail: 0, skip: 0, unknown: 0 };
+    for (const r of result.results) {
+      counts[r.status]++;
+    }
 
     console.log(
-      `\nSummary: ${passed.length} passed, ${failed.length} failed, ${skipped.length} allowlisted, ${unknown.length} unknown`,
+      `\nSummary: ${counts.pass} passed, ${counts.fail} failed, ${counts.skip} allowlisted, ${counts.unknown} unknown`,
     );
 
-    if (failed.length > 0) {
+    if (counts.fail > 0) {
       console.log(
-        `\n${failed.length} dependency(s) exceed the ${formatAge(result.threshold)} threshold.`,
+        `\n${counts.fail} dependency(s) exceed the ${formatAge(result.threshold)} threshold.`,
       );
       console.log("Add them to your dusty-deps config allowlist with a reason, or update them.");
     }
